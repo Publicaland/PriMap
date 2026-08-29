@@ -1,0 +1,31 @@
+<script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
+
+<dialog id="components-reconnect-modal" data-nosnippet>
+    <div class="components-reconnect-container">
+        <div class="components-rejoining-animation" aria-hidden="true">
+            <div></div>
+            <div></div>
+        </div>
+        <p class="components-reconnect-first-attempt-visible">
+            Reconectarea la server...
+        </p>
+        <p class="components-reconnect-repeated-attempt-visible">
+            Reconectarea a eșuat... se încearcă din nou în <span id="components-seconds-to-next-attempt"></span> secunde.
+        </p>
+        <p class="components-reconnect-failed-visible">
+            Nu s-a reușit reconectarea.<br />Vă rugăm să încercați din nou sau să reîncărcați pagina.
+        </p>
+        <button id="components-reconnect-button" class="components-reconnect-failed-visible">
+            Reîncercare
+        </button>
+        <p class="components-pause-visible">
+            Sesiunea a fost întreruptă de server.
+        </p>
+        <p class="components-resume-failed-visible">
+            Nu s-a reușit reluarea sesiunii.<br />Vă rugăm să încercați din nou sau să reîncărcați pagina.
+        </p>
+        <button id="components-resume-button" class="components-pause-visible components-resume-failed-visible">
+            Reluare
+        </button>
+    </div>
+</dialog>
