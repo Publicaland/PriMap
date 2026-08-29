@@ -1,0 +1,36 @@
+@page "/error"
+@using System.Diagnostics
+
+<PageTitle>Eroare</PageTitle>
+
+<h1 class="text-danger">Eroare.</h1>
+<h2 class="text-danger">A apărut o eroare în timpul procesării solicitării.</h2>
+
+@if (ShowRequestId)
+{
+    <p>
+        <strong>ID solicitare:</strong> <code>@RequestId</code>
+    </p>
+}
+
+<h3>Mod dezvoltare</h3>
+<p>
+    Comutarea la <strong>Mod dezvoltare</strong> va afișa informații mai detaliate despre eroarea care a apărut.
+</p>
+<p>
+    <strong>Mediul de dezvoltare nu ar trebui să fie activat pentru aplicațiile implementate.</strong>
+    Poate duce la afișarea informațiilor sensibile din excepții utilizatorilor finali.
+    Pentru depanare locală, activați mediul <strong>Mod dezvoltare</strong> prin setarea variabilei de mediu
+    <strong>ASPNETCORE_ENVIRONMENT</strong> la <strong>Mod dezvoltare</strong> și restartarea aplicației.
+</p>
+
+@code{
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+
+    protected override void OnInitialized() =>
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}
