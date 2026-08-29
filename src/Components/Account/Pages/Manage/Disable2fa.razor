@@ -1,0 +1,74 @@
+@page "/Account/Manage/Disable2fa"
+
+@using Microsoft.AspNetCore.Identity
+@using PriMap.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<Disable2fa> Logger
+
+<PageTitle>Dezactivează autentificarea în doi pași (2FA)</PageTitle>
+
+<StatusMessage />
+<h3>Dezactivează autentificarea în doi pași (2FA)</h3>
+
+<div class="alert alert-warning" role="alert">
+    <p>
+        <strong>Această acțiune dezactivează doar 2FA.</strong>
+    </p>
+    <p>
+        Dezactivarea 2FA nu schimbă cheile utilizate în aplicațiile de autentificare. Dacă dorești să schimbi cheia
+        utilizată într-o aplicație de autentificare, ar trebui să <a href="Account/Manage/ResetAuthenticator">resetezi cheile de autentificare.</a>
+    </p>
+</div>
+
+<div>
+    <form @formname="disable-2fa" @onsubmit="OnSubmitAsync" method="post">
+        <AntiforgeryToken />
+        <button class="btn btn-danger" type="submit">Dezactivează 2FA</button>
+    </form>
+</div>
+
+@code {
+    private ApplicationUser? user;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserManager.GetUserAsync(HttpContext.User);
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        if (HttpMethods.IsGet(HttpContext.Request.Method) && !await UserManager.GetTwoFactorEnabledAsync(user))
+        {
+            throw new InvalidOperationException("Nu se poate dezactiva 2FA pentru utilizatorul dat deoarece nu este momentan activată.");
+        }
+    }
+
+    private async Task OnSubmitAsync()
+    {
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        var disable2faResult = await UserManager.SetTwoFactorEnabledAsync(user, false);
+        if (!disable2faResult.Succeeded)
+        {
+            throw new InvalidOperationException("O eroare neprevăzută a apărut la dezactivarea 2FA.");
+        }
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        Logger.LogInformation("Utilizatorul cu ID '{UserId}' a dezactivat 2FA.", userId);
+        RedirectManager.RedirectToWithStatus(
+            "Account/Manage/TwoFactorAuthentication",
+            "2fa a fost dezactivat. Poți reactiva 2fa când setezi o aplicație de autentificare",
+            HttpContext);
+    }
+}
