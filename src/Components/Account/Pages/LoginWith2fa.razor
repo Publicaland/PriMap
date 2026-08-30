@@ -1,0 +1,102 @@
+@page "/Account/LoginWith2fa"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using PriMap.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<LoginWith2fa> Logger
+
+<PageTitle>Autentificare cu doi factori</PageTitle>
+
+<h1>Autentificare cu doi factori</h1>
+<hr />
+<StatusMessage Message="@message" />
+<p>Logarea ta este protejată cu o aplicație de autentificare. Introdu codul de autentificare mai jos.</p>
+<div class="row">
+    <div class="col-md-4">
+        <EditForm Model="Input" FormName="login-with-2fa" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+            <input type="hidden" name="RememberMe" value="@RememberMe" />
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.TwoFactorCode" id="Input.TwoFactorCode" class="form-control" autocomplete="off" />
+                <label for="Input.TwoFactorCode" class="form-label">Cod de autentificare</label>
+                <ValidationMessage For="() => Input.TwoFactorCode" class="text-danger" />
+            </div>
+            <div class="checkbox mb-3">
+                <label for="remember-machine" class="form-label">
+                    <InputCheckbox @bind-Value="Input.RememberMachine" />
+                    Amintește-ți de acest dispozitiv
+                </label>
+            </div>
+            <div>
+                <button type="submit" class="w-100 btn btn-lg btn-primary">Autentificare</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+<p>
+    Nu ai acces la dispozitivul de autentificare? Te poți <a href="Account/LoginWithRecoveryCode?ReturnUrl=@ReturnUrl"> autentifica cu un cod de recuperare</a>.
+</p>
+
+@code {
+    private string? message;
+    private ApplicationUser user = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private bool RememberMe { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+
+        // Ensure the user has gone through the username & password screen first
+        user = await SignInManager.GetTwoFactorAuthenticationUserAsync() ??
+            throw new InvalidOperationException("Nu se poate încărca utilizatorul cu autentificare pe factori multipli.");
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var authenticatorCode = Input.TwoFactorCode!.Replace(" ", string.Empty).Replace("-", string.Empty);
+        var result = await SignInManager.TwoFactorAuthenticatorSignInAsync(authenticatorCode, RememberMe, Input.RememberMachine);
+        var userId = await UserManager.GetUserIdAsync(user);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("Utilizatorul cu ID-ul '{UserId}' s-a autentificat cu 2FA.", userId);
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("Contul de utilizator cu ID-ul '{UserId}' este blocat.", userId);
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+        else
+        {
+            Logger.LogWarning("Cod de autentificare invalid introdus pentru utilizatorul cu ID-ul '{UserId}'.", userId);
+            message = "Eroare: Cod de autentificare invalid.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [StringLength(7, ErrorMessage = "{0} trebuie să aibă cel puțin {2} și cel mult {1} caractere.", MinimumLength = 6)]
+        [DataType(DataType.Text)]
+        [Display(Name = "Cod de autentificare")]
+        public string? TwoFactorCode { get; set; }
+
+        [Display(Name = "Amintește-ți de acest dispozitiv")]
+        public bool RememberMachine { get; set; }
+    }
+}
