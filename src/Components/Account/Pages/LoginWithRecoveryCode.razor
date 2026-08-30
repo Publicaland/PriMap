@@ -1,0 +1,86 @@
+@page "/Account/LoginWithRecoveryCode"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using PriMap.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<LoginWithRecoveryCode> Logger
+
+<PageTitle>Verificare cod de recuperare</PageTitle>
+
+<h1>Verificare cod de recuperare</h1>
+<hr />
+<StatusMessage Message="@message" />
+<p>
+    Ai solicitat logarea cu un cod de recuperare. Această logare nu va fi amintită până când nu furnizezi
+    un cod din aplicația de autentificare la logare sau dezactivezi 2FA și te logezi din nou.
+</p>
+<div class="row">
+    <div class="col-md-4">
+        <EditForm Model="Input" FormName="login-with-recovery-code" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.RecoveryCode" id="Input.RecoveryCode" class="form-control" autocomplete="off" placeholder="RecoveryCode" />
+                <label for="Input.RecoveryCode" class="form-label">Cod de recuperare</label>
+                <ValidationMessage For="() => Input.RecoveryCode" class="text-danger" />
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Autentificare</button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private string? message;
+    private ApplicationUser user = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+
+        user = await SignInManager.GetTwoFactorAuthenticationUserAsync() ??
+            throw new InvalidOperationException("Nu se poate încărca utilizatorul cu autentificare pe factori multipli.");
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var recoveryCode = Input.RecoveryCode.Replace(" ", string.Empty);
+
+        var result = await SignInManager.TwoFactorRecoveryCodeSignInAsync(recoveryCode);
+
+        var userId = await UserManager.GetUserIdAsync(user);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("Utilizatorul cu ID-ul '{UserId}' s-a autentificat cu un cod de recuperare.", userId);
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("Contul de utilizator este blocat.");
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+        else
+        {
+            Logger.LogWarning("Cod de recuperare invalid introdus pentru utilizatorul cu ID-ul '{UserId}' ", userId);
+            message = "Eroare: Cod de recuperare invalid introdus.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [DataType(DataType.Text)]
+        [Display(Name = "Cod de recuperare")]
+        public string RecoveryCode { get; set; } = "";
+    }
+}
