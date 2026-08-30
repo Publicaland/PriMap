@@ -1,23 +1,97 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedLocalStorage LocalStorage
 
-<div class="page">
-    <div class="sidebar">
+<MudThemeProvider Theme="AppTheme.Default" @bind-IsDarkMode="_isDarkMode" @ref="_themeProvider" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                        OnClick="@(() => _drawerOpen = !_drawerOpen)" />
+        <MudIcon Icon="@Icons.Material.Filled.Map" Class="ml-2 mr-2" />
+        <MudText Typo="Typo.h6">PriMap</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                        Color="Color.Inherit"
+                        OnClick="ToggleDarkModeAsync"
+                        title="Comută tema" />
+        <AuthorizeView>
+            <Authorized>
+                <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                    <MudMenuItem Href="Account/Manage" Icon="@Icons.Material.Filled.ManageAccounts">@context.User.Identity?.Name</MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem>
+                        <form action="Account/Logout" method="post">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReturnUrl" value="@_currentUrl" />
+                            <button type="submit" class="primap-logout-btn">
+                                <MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" Class="mr-2" /> Deconectare
+                            </button>
+                        </form>
+                    </MudMenuItem>
+                </MudMenu>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Href="Account/Login" Color="Color.Inherit" Variant="Variant.Text">Autentificare</MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0" Variant="DrawerVariant.Responsive" ClipMode="DrawerClipMode.Always">
         <NavMenu />
-    </div>
+    </MudDrawer>
 
-    <main>
-        <div class="top-row px-4">
-            <span class="top-row-title">Platforma GIS pentru administrația locală.</span>
-        </div>
-
-        <article class="content px-4">
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
-    A apărut o eroare neașteptată.
+    O eroare neașteptată a avut loc.
     <a href="." class="reload">Reîncarcă</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode;
+    private MudThemeProvider? _themeProvider;
+    private string? _currentUrl;
+
+    protected override void OnInitialized()
+    {
+        _currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var storedPreference = await LocalStorage.GetAsync<bool>("primap-dark-mode");
+            if (storedPreference.Success)
+            {
+                _isDarkMode = storedPreference.Value;
+            }
+            else if (_themeProvider is not null)
+            {
+                _isDarkMode = await _themeProvider.GetSystemDarkModeAsync();
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleDarkModeAsync()
+    {
+        _isDarkMode = !_isDarkMode;
+        await LocalStorage.SetAsync("primap-dark-mode", _isDarkMode);
+    }
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+}
