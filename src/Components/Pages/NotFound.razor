@@ -1,5 +1,17 @@
 @page "/not-found"
 @layout MainLayout
 
-<h3>Nu am găsit conținutul</h3>
-<p>Ne pare rău, conținutul căutat nu există.</p>
+<PageTitle>Pagina nu a fost găsită</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+    <MudPaper Class="pa-8 text-center" Elevation="2">
+        <MudIcon Icon="@Icons.Material.Filled.WrongLocation" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+        <MudText Typo="Typo.h5" Class="mb-2">Pagina nu a fost găsită</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+            Conținutul căutat nu există sau a fost mutat.
+        </MudText>
+        <MudButton Href="" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Home">
+            Înapoi la pagina principală
+        </MudButton>
+    </MudPaper>
+</MudContainer>
