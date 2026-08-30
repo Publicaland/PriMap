@@ -30,7 +30,7 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AppPolicies.CanAnalyze, p => p.RequireRole(AppRoles.Analyst, AppRoles.Admin))
     .AddPolicy(AppPolicies.CanManage, p => p.RequireRole(AppRoles.Admin));
 
-var connectionString = builder.Configuration.GetConnectionString("SqlConnection") ?? throw new InvalidOperationException("Connection string 'SqlConnection' not found.");
+var connectionString = builder.Configuration.GetConnectionString("SqlConnection") ?? throw new InvalidOperationException("Nu am găsit 'SqlConnection' ca și string de conexiune.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString, sql => sql.UseNetTopologySuite()));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
