@@ -1,0 +1,78 @@
+@page "/Account/Manage/GenerateRecoveryCodes"
+
+@using Microsoft.AspNetCore.Identity
+@using PriMap.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<GenerateRecoveryCodes> Logger
+
+<PageTitle>Generează coduri de recuperare pentru autentificarea cu doi factori (2FA)</PageTitle>
+
+@if (recoveryCodes is not null)
+{
+    <ShowRecoveryCodes RecoveryCodes="recoveryCodes.ToArray()" StatusMessage="@message" />
+}
+else
+{
+    <h3>Generează coduri de recuperare pentru autentificarea cu doi factori (2FA)</h3>
+    <div class="alert alert-warning" role="alert">
+        <p>
+            <span class="glyphicon glyphicon-warning-sign"></span>
+            <strong>Pune aceste coduri într-un loc sigur.</strong>
+        </p>
+        <p>
+            Dacă îți pierzi dispozitivul și nu ai codurile de recuperare, vei pierde accesul la contul tău.
+        </p>
+        <p>
+            Generarea de coduri de recuperare noi nu modifică cheile utilizate în aplicațiile de autentificare. Dacă dorești să modifici cheia
+            utilizată într-o aplicație de autentificare, ar trebui să <a href="Account/Manage/ResetAuthenticator">resetezi cheile de autentificare.</a>
+        </p>
+    </div>
+    <div>
+        <form @formname="generate-recovery-codes" @onsubmit="OnSubmitAsync" method="post">
+            <AntiforgeryToken />
+            <button class="btn btn-danger" type="submit">Generează Coduri de Recuperare</button>
+        </form>
+    </div>
+}
+
+@code {
+    private string? message;
+    private ApplicationUser? user;
+    private IEnumerable<string>? recoveryCodes;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserManager.GetUserAsync(HttpContext.User);
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        var isTwoFactorEnabled = await UserManager.GetTwoFactorEnabledAsync(user);
+        if (!isTwoFactorEnabled)
+        {
+            throw new InvalidOperationException("Nu se pot genera coduri de recuperare pentru utilizatorul respectiv deoarece nu au fost activate opțiunile de autentificare cu doi factori (2FA).");
+        }
+    }
+
+    private async Task OnSubmitAsync()
+    {
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        recoveryCodes = await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+        message = "Ai generat coduri de recuperare noi.";
+
+        Logger.LogInformation("Utilizatorul cu ID '{UserId}' a generat noi coduri de recuperare 2FA.", userId);
+    }
+}
