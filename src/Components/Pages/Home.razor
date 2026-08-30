@@ -1,23 +1,42 @@
 @page "/"
+@attribute [Authorize(Policy = AppPolicies.CanView)]
 
 <PageTitle>PriMap</PageTitle>
 
-<div class="hero">
-    <h1>PriMap</h1>
-    <p class="lead">Platforma GIS pentru administrația locală.</p>
-</div>
+<MudStack Spacing="1" Class="mb-6">
+    <MudText Typo="Typo.h4" Color="Color.Primary">PriMap</MudText>
+    <MudText Typo="Typo.subtitle1" Color="Color.Secondary">Platforma GIS pentru administrația locală</MudText>
+</MudStack>
 
-<div class="card-grid">
-    <div class="info-card">
-        <h3>Hărți interactive</h3>
-        <p>Vizualizează parcele, adrese și limite administrative direct pe hartă.</p>
-    </div>
-    <div class="info-card">
-        <h3>Date administrative</h3>
-        <p>Centralizează informațiile despre teritoriul primăriei într-un singur loc.</p>
-    </div>
-    <div class="info-card">
-        <h3>Acces securizat</h3>
-        <p>Autentificare pentru utilizatorii autorizați ai instituției.</p>
-    </div>
-</div>
+<MudGrid>
+    <MudItem xs="12" sm="4">
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Primary" Class="mb-2" />
+            <MudText Typo="Typo.h6">Hărți interactive</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Vizualizează parcele, adrese și limite administrative direct pe hartă.
+            </MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudIcon Icon="@Icons.Material.Filled.Storage" Color="Color.Primary" Class="mb-2" />
+            <MudText Typo="Typo.h6">Date administrative</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Centralizează informațiile despre teritoriul primăriei într-un singur loc.
+            </MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" Class="mb-2" />
+            <MudText Typo="Typo.h6">Acces securizat</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Autentificare pentru utilizatorii autorizați ai instituției.
+            </MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+}
