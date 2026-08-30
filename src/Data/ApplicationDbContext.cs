@@ -15,6 +15,35 @@ namespace PriMap.Data
         public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
         public DbSet<ImportRowResult> ImportRowResults => Set<ImportRowResult>();
 
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            ValidateFeatureSrids();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            ValidateFeatureSrids();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void ValidateFeatureSrids()
+        {
+            var offending = ChangeTracker.Entries<GisFeature>()
+                .Where(e => e.State is EntityState.Added or EntityState.Modified)
+                .Where(e => e.Entity.Geometry is null || e.Entity.Geometry.SRID != FeatureSrid)
+                .Select(e => e.Entity)
+                .ToList();
+
+            if (offending.Count > 0)
+            {
+                var ids = string.Join(", ", offending.Select(f => f.Id == 0 ? "(new)" : f.Id.ToString()));
+                throw new InvalidOperationException(
+                    $"Refuzare salvare GisFeature(s) [{ids}] cu o geometrie care este null sau nu este SRID {FeatureSrid}. " +
+                    $"Construiește geometriile via {nameof(SpatialFactory)}.{nameof(SpatialFactory.Instance)} (sau setează SRID-ul explicit după prelucrarea unui import) înainte de a le atribui GisFeature.Geometry.");
+            }
+        }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
