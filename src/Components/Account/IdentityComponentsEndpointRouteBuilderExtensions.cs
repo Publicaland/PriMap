@@ -15,6 +15,7 @@ namespace Microsoft.AspNetCore.Routing
 {
     internal static class IdentityComponentsEndpointRouteBuilderExtensions
     {
+        // These endpoints are required by the Identity Razor components defined in the /Components/Account/Pages directory of this project.
         public static IEndpointConventionBuilder MapAdditionalIdentityEndpoints(this IEndpointRouteBuilder endpoints)
         {
             ArgumentNullException.ThrowIfNull(endpoints);
@@ -124,6 +125,7 @@ namespace Microsoft.AspNetCore.Routing
                 var userId = await userManager.GetUserIdAsync(user);
                 downloadLogger.LogInformation("Utilizatorul cu ID-ul '{UserId}' a solicitat datele personale.", userId);
 
+                // Only include personal data for download
                 var personalData = new Dictionary<string, string>();
                 var personalDataProps = typeof(ApplicationUser).GetProperties().Where(
                     prop => Attribute.IsDefined(prop, typeof(PersonalDataAttribute)));
@@ -135,7 +137,7 @@ namespace Microsoft.AspNetCore.Routing
                 var logins = await userManager.GetLoginsAsync(user);
                 foreach (var l in logins)
                 {
-                    personalData.Add($"{l.LoginProvider} external login provider key", l.ProviderKey);
+                    personalData.Add($"Cheia furnizorului extern de autentificare {l.LoginProvider}", l.ProviderKey);
                 }
 
                 personalData.Add("Authenticator Key", (await userManager.GetAuthenticatorKeyAsync(user))!);
