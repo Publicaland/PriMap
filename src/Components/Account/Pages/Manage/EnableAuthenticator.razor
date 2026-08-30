@@ -1,0 +1,183 @@
+@page "/Account/Manage/EnableAuthenticator"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using PriMap.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject UrlEncoder UrlEncoder
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<EnableAuthenticator> Logger
+
+<PageTitle>Configurare aplicație de autentificare cu doi factori</PageTitle>
+
+@if (recoveryCodes is not null)
+{
+    <ShowRecoveryCodes RecoveryCodes="recoveryCodes.ToArray()" StatusMessage="@message" />
+}
+else
+{
+    <StatusMessage Message="@message" />
+    <h3>Configurare aplicație de autentificare cu doi factori</h3>
+    <div>
+        <p>Pentru a utiliza o aplicație de autentificare cu doi factori, urmează următorii pași:</p>
+        <ol class="list">
+            <li>
+                <p>
+                    Descarcă o aplicație de autentificare cu doi factori, cum ar fi Bitwarden Authenticator pentru
+                    <a href="https://play.google.com/store/apps/details?id=com.bitwarden.authenticator">Android</a> și
+                    <a href="https://apps.apple.com/us/app/bitwarden-authenticator/id6497335175">iOS</a>,
+                    Microsoft Authenticator pentru
+                    <a href="https://play.google.com/store/apps/details?id=com.azure.authenticator">Android</a> și
+                    <a href="https://apps.apple.com/us/app/microsoft-authenticator/id983156458">iOS</a> sau
+                    Google Authenticator pentru
+                    <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2">Android</a> și
+                    <a href="https://itunes.apple.com/us/app/google-authenticator/id388497605">iOS</a>.
+                </p>
+            </li>
+            <li>
+                <p>Scanează codul QR sau introdu această cheie <kbd>@sharedKey</kbd> în aplicația ta de autentificare cu doi factori. Spațiile și literele mari/mici nu contează.</p>
+                <div></div>
+                <div data-url="@authenticatorUri"></div>
+            </li>
+            <li>
+                <p>
+                    După ce ai scanat codul QR sau ai introdus cheia de mai sus, aplicația ta de autentificare cu doi factori îți va furniza un cod unic. Introdu codul în caseta de confirmare de mai jos.
+                </p>
+                <div class="row">
+                    <div class="col-xl-6">
+                        <EditForm Model="Input" FormName="send-code" OnValidSubmit="OnValidSubmitAsync" method="post">
+                            <DataAnnotationsValidator />
+                            <div class="form-floating mb-3">
+                                <InputText @bind-Value="Input.Code" id="Input.Code" class="form-control" autocomplete="off" placeholder="Enter the code" />
+                                <label for="Input.Code" class="control-label form-label">Cod de verificare</label>
+                                <ValidationMessage For="() => Input.Code" class="text-danger" />
+                            </div>
+                            <button type="submit" class="w-100 btn btn-lg btn-primary">Verifică</button>
+                            <ValidationSummary class="text-danger" role="alert" />
+                        </EditForm>
+                    </div>
+                </div>
+            </li>
+        </ol>
+    </div>
+}
+
+@code {
+    private const string AuthenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
+
+    private string? message;
+    private ApplicationUser? user;
+    private string? sharedKey;
+    private string? authenticatorUri;
+    private IEnumerable<string>? recoveryCodes;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+
+        user = await UserManager.GetUserAsync(HttpContext.User);
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        await LoadSharedKeyAndQrCodeUriAsync(user);
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        var verificationCode = Input.Code.Replace(" ", string.Empty).Replace("-", string.Empty);
+
+        var is2faTokenValid = await UserManager.VerifyTwoFactorTokenAsync(
+            user, UserManager.Options.Tokens.AuthenticatorTokenProvider, verificationCode);
+
+        if (!is2faTokenValid)
+        {
+            message = "Eroare: Codul de verificare este invalid.";
+            return;
+        }
+
+        await UserManager.SetTwoFactorEnabledAsync(user, true);
+        var userId = await UserManager.GetUserIdAsync(user);
+        Logger.LogInformation("Utilizatorul cu ID '{UserId}' a activat 2FA cu o aplicație de autentificare.", userId);
+
+        message = "Aplicația ta de autentificare a fost verificată.";
+
+        if (await UserManager.CountRecoveryCodesAsync(user) == 0)
+        {
+            recoveryCodes = await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+        }
+        else
+        {
+            RedirectManager.RedirectToWithStatus("Account/Manage/TwoFactorAuthentication", message, HttpContext);
+        }
+    }
+
+    private async ValueTask LoadSharedKeyAndQrCodeUriAsync(ApplicationUser user)
+    {
+        var unformattedKey = await UserManager.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(unformattedKey))
+        {
+            await UserManager.ResetAuthenticatorKeyAsync(user);
+            unformattedKey = await UserManager.GetAuthenticatorKeyAsync(user);
+        }
+
+        sharedKey = FormatKey(unformattedKey!);
+
+        var email = await UserManager.GetEmailAsync(user);
+        authenticatorUri = GenerateQrCodeUri(email!, unformattedKey!);
+    }
+
+    private string FormatKey(string unformattedKey)
+    {
+        var result = new StringBuilder();
+        int currentPosition = 0;
+        while (currentPosition + 4 < unformattedKey.Length)
+        {
+            result.Append(unformattedKey.AsSpan(currentPosition, 4)).Append(' ');
+            currentPosition += 4;
+        }
+        if (currentPosition < unformattedKey.Length)
+        {
+            result.Append(unformattedKey.AsSpan(currentPosition));
+        }
+
+        return result.ToString().ToLowerInvariant();
+    }
+
+    private string GenerateQrCodeUri(string email, string unformattedKey)
+    {
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            AuthenticatorUriFormat,
+            UrlEncoder.Encode("Microsoft.AspNetCore.Identity.UI"),
+            UrlEncoder.Encode(email),
+            unformattedKey);
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [StringLength(7, ErrorMessage = "{0} trebuie să aibă cel puțin {2} și cel mult {1} caractere.", MinimumLength = 6)]
+        [DataType(DataType.Text)]
+        [Display(Name = "Cod de verificare")]
+        public string Code { get; set; } = "";
+    }
+}
