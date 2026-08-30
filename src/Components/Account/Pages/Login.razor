@@ -36,7 +36,7 @@
                 <div class="checkbox mb-3">
                     <label class="form-label">
                         <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
-                       Ține-mă minte
+                        Ține-mă minte
                     </label>
                 </div>
                 <div>
@@ -50,13 +50,13 @@
                 <hr />
                 <div>
                     <p>
-                        <a href="Account/ForgotPassword">Ai uitat parola?</a>
+                        <a href="Account/ForgotPassword">Ți-ai uitat parola?</a>
                     </p>
                     <p>
-                        <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Înregistrează-te ca utilizator nou</a>
+                        <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Înregistrează-te ca un utilizator nou</a>
                     </p>
                     <p>
-                        <a href="Account/ResendEmailConfirmation">Retrimite confirmarea emailului</a>
+                        <a href="Account/ResendEmailConfirmation">Retrimite emailul de confirmare</a>
                     </p>
                 </div>
             </EditForm>
@@ -64,7 +64,7 @@
     </div>
     <div class="col-lg-4 col-lg-offset-2">
         <section>
-            <h3>Folosește un alt serviciu pentru a te autentifica.</h3>
+            <h3>Folosește un alt serviciu pentru autentificare.</h3>
             <hr />
             <ExternalLoginPicker />
         </section>
@@ -121,7 +121,7 @@
 
         if (result.Succeeded)
         {
-            Logger.LogInformation("Utilizatorul {0} a fost autentificat.", Input.Email);
+            Logger.LogInformation("Utilizatorul s-a autentificat.");
             RedirectManager.RedirectTo(ReturnUrl);
         }
         else if (result.RequiresTwoFactor)
@@ -132,7 +132,7 @@
         }
         else if (result.IsLockedOut)
         {
-            Logger.LogWarning("Contul utilizatorului {0} a fost blocat.", Input.Email);
+            Logger.LogWarning("Contul de utilizator este blocat.");
             RedirectManager.RedirectTo("Account/Lockout");
         }
         else
