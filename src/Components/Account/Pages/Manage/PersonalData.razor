@@ -1,0 +1,42 @@
+@page "/Account/Manage/PersonalData"
+
+@using Microsoft.AspNetCore.Identity
+@using PriMap.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Date Personale</PageTitle>
+
+<StatusMessage />
+<h3>Date Personale</h3>
+
+<div class="row">
+    <div class="col-md-6">
+        <p>Contul tău conține date personale pe care ni le-ai furnizat. Această pagină îți permite să descarci sau să ștergi acele date.</p>
+        <p>
+            <strong>Ștergerea acestor date va elimina permanent contul tău, iar această acțiune nu poate fi anulată.</strong>
+        </p>
+        <form action="Account/Manage/DownloadPersonalData" method="post">
+            <AntiforgeryToken />
+            <button class="btn btn-primary" type="submit">Descarcă</button>
+        </form>
+        <p>
+            <a href="Account/Manage/DeletePersonalData" class="btn btn-danger">Șterge</a>
+        </p>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user  = await UserManager.GetUserAsync(HttpContext.User);
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+        }
+    }
+}
