@@ -1,0 +1,57 @@
+@page "/Account/Manage/ResetAuthenticator"
+
+@using Microsoft.AspNetCore.Identity
+@using PriMap.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<ResetAuthenticator> Logger
+
+<PageTitle>Resetare cheie de autentificare</PageTitle>
+
+<StatusMessage />
+<h3>Resetare cheie de autentificare</h3>
+<div class="alert alert-warning" role="alert">
+    <p>
+        <span class="glyphicon glyphicon-warning-sign"></span>
+        <strong>Dacă resetezi cheia ta de autentificare, aplicația ta de autentificare nu va funcționa până nu o reconfigurezi.</strong>
+    </p>
+    <p>
+        Acest proces dezactivează autentificarea în doi pași până când nu verifici aplicația ta de autentificare.
+        Dacă nu finalizezi configurarea aplicației tale de autentificare, poți pierde accesul la contul tău.
+    </p>
+</div>
+<div>
+    <form @formname="reset-authenticator" @onsubmit="OnSubmitAsync" method="post">
+        <AntiforgeryToken />
+        <button class="btn btn-danger" type="submit">Resetare cheie de autentificare</button>
+    </form>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private async Task OnSubmitAsync()
+    {
+        var user = await UserManager.GetUserAsync(HttpContext.User);
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        await UserManager.SetTwoFactorEnabledAsync(user, false);
+        await UserManager.ResetAuthenticatorKeyAsync(user);
+        var userId = await UserManager.GetUserIdAsync(user);
+        Logger.LogInformation("Utilizatorul cu ID '{UserId}' a resetat cheia aplicației de autentificare.", userId);
+
+        await SignInManager.RefreshSignInAsync(user);
+
+        RedirectManager.RedirectToWithStatus(
+            "Account/Manage/EnableAuthenticator",
+            "Cheia aplicației de autentificare a fost resetată, va trebui să reconfigurezi aplicația de autentificare folosind noua cheie.",
+            HttpContext);
+    }
+}
