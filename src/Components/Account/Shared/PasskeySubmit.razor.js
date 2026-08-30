@@ -1,40 +1,120 @@
-@using Microsoft.AspNetCore.Antiforgery
-@inject IServiceProvider Services
+const browserSupportsPasskeys =
+    typeof navigator.credentials !== 'undefined' &&
+    typeof window.PublicKeyCredential !== 'undefined' &&
+    typeof window.PublicKeyCredential.parseCreationOptionsFromJSON === 'function' &&
+    typeof window.PublicKeyCredential.parseRequestOptionsFromJSON === 'function';
 
-<button type="submit" name="__passkeySubmit" @attributes="AdditionalAttributes">@ChildContent</button>
-<passkey-submit
-    operation="@Operation"
-    name="@Name"
-    email-name="@EmailName"
-    request-token-name="@tokens?.HeaderName"
-    request-token-value="@tokens?.RequestToken">
-</passkey-submit>
-
-@code {
-    private AntiforgeryTokenSet? tokens;
-
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
-
-    [Parameter]
-    [EditorRequired]
-    public PasskeyOperation Operation { get; set; }
-
-    [Parameter]
-    [EditorRequired]
-    public string Name { get; set; } = default!;
-
-    [Parameter]
-    public string? EmailName { get; set; }
-
-    [Parameter]
-    public RenderFragment? ChildContent { get; set; }
-
-    [Parameter(CaptureUnmatchedValues = true)]
-    public IDictionary<string, object>? AdditionalAttributes { get; set; }
-
-    protected override void OnInitialized()
-    {
-        tokens = Services.GetService<IAntiforgery>()?.GetTokens(HttpContext);
+async function fetchWithErrorHandling(url, options = {}) {
+    const response = await fetch(url, {
+        credentials: 'include',
+        ...options
+    });
+    if (!response.ok) {
+        const text = await response.text();
+        console.error(text);
+        throw new Error(`Server-ul a răspuns cu statusul ${response.status}.`);
     }
+    return response;
 }
+
+async function createCredential(headers, signal) {
+    const optionsResponse = await fetchWithErrorHandling('/Account/PasskeyCreationOptions', {
+        method: 'POST',
+        headers,
+        signal,
+    });
+    const optionsJson = await optionsResponse.json();
+    const options = PublicKeyCredential.parseCreationOptionsFromJSON(optionsJson);
+    return await navigator.credentials.create({ publicKey: options, signal });
+}
+
+async function requestCredential(email, mediation, headers, signal) {
+    const optionsResponse = await fetchWithErrorHandling(`/Account/PasskeyRequestOptions?username=${email}`, {
+        method: 'POST',
+        headers,
+        signal,
+    });
+    const optionsJson = await optionsResponse.json();
+    const options = PublicKeyCredential.parseRequestOptionsFromJSON(optionsJson);
+    return await navigator.credentials.get({ publicKey: options, mediation, signal });
+}
+
+customElements.define('passkey-submit', class extends HTMLElement {
+    static formAssociated = true;
+
+    connectedCallback() {
+        this.internals = this.attachInternals();
+        this.attrs = {
+            operation: this.getAttribute('operation'),
+            name: this.getAttribute('name'),
+            emailName: this.getAttribute('email-name'),
+            requestTokenName: this.getAttribute('request-token-name'),
+            requestTokenValue: this.getAttribute('request-token-value'),
+        };
+
+        this.internals.form.addEventListener('submit', (event) => {
+            if (event.submitter?.name === '__passkeySubmit') {
+                event.preventDefault();
+                this.obtainAndSubmitCredential();
+            }
+        });
+
+        this.tryAutofillPasskey();
+    }
+
+    disconnectedCallback() {
+        this.abortController?.abort();
+    }
+
+    async obtainCredential(useConditionalMediation, signal) {
+        if (!browserSupportsPasskeys) {
+            throw new Error('Unele funcționalități ale cheilor de acces lipsesc. Vă rugăm să actualizați browserul.');
+        }
+
+        const headers = {
+            [this.attrs.requestTokenName]: this.attrs.requestTokenValue,
+        };
+
+        if (this.attrs.operation === 'Create') {
+            return await createCredential(headers, signal);
+        } else if (this.attrs.operation === 'Request') {
+            const email = new FormData(this.internals.form).get(this.attrs.emailName);
+            const mediation = useConditionalMediation ? 'conditional' : undefined;
+            return await requestCredential(email, mediation, headers, signal);
+        } else {
+            throw new Error(`Operațiunea pentru cheia de acces necunoscută '${this.attrs.operation}'.`);
+        }
+    }
+
+    async obtainAndSubmitCredential(useConditionalMediation = false) {
+        this.abortController?.abort();
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
+        const formData = new FormData();
+        try {
+            const credential = await this.obtainCredential(useConditionalMediation, signal);
+            const credentialJson = JSON.stringify(credential);
+            formData.append(`${this.attrs.name}.CredentialJson`, credentialJson);
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                return;
+            }
+            console.error(error);
+            if (useConditionalMediation) {
+                return;
+            }
+            const errorMessage = error.name === 'NotAllowedError'
+                ? 'Nu a fost furnizată nicio cheie de acces de către aplicația de autentificare.'
+                : error.message;
+            formData.append(`${this.attrs.name}.Error`, errorMessage);
+        }
+        this.internals.setFormValue(formData);
+        this.internals.form.submit();
+    }
+
+    async tryAutofillPasskey() {
+        if (browserSupportsPasskeys && this.attrs.operation === 'Request' && await PublicKeyCredential.isConditionalMediationAvailable?.()) {
+            await this.obtainAndSubmitCredential(/* useConditionalMediation */ true);
+        }
+    }
+});
