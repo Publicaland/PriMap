@@ -1,0 +1,17 @@
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+    <MudPaper Class="pa-8 text-center" Elevation="2">
+        <MudIcon Icon="@Icons.Material.Filled.HourglassTop" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+        <MudText Typo="Typo.h5" Class="mb-2">Cont în așteptare</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+            Contul dumneavoastră a fost creat, dar nu are încă un rol atribuit.
+            Contactați un administrator pentru a primi acces.
+        </MudText>
+        <form action="Account/Logout" method="post">
+            <AntiforgeryToken />
+            <input type="hidden" name="ReturnUrl" value="/" />
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Logout">
+                Deconectare
+            </MudButton>
+        </form>
+    </MudPaper>
+</MudContainer>
